@@ -5,33 +5,10 @@ const puppeteer = require('puppeteer');
   const page = await browser.newPage();
   page.on('load', () => console.log(`Page loaded! url: ${page.url()}`));
 
-  console.log('访问 iconfont 主页...');
-  await page.goto('https://www.iconfont.cn/', { waitUntil: 'networkidle0' });
+  await gotoIconfontHome(page);
+  await loginOfGithub(page);
+  await authOfGithub(page);
 
-  const loginEle = await page.$('.signin');
-  // console.log('loginEle:', loginEle);
-  console.log('点击登录按钮...');
-  await loginEle.click();
-  const loginGithubEle = await page.waitForSelector(
-    'a[href="/api/login/github"]',
-    { visible: true }
-  );
-  console.log('点击登录 Github...');
-  await loginGithubEle.click();
-
-  console.log('Github 登录中...');
-  await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  const loginFieldOfGithub = await page.$('#login_field');
-  await loginFieldOfGithub.type('6261625@qq.com');
-  const passwordFieldOfGithub = await page.$('#password');
-  await passwordFieldOfGithub.type('leo06010213');
-  const submitOfGithub = await page.$('input[type="submit"]');
-  await submitOfGithub.click();
-
-  console.log('Github 授权页面...');
-  await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  await page.waitForNavigation({ timeout: 2000 });
-  console.log(page.url());
   // await page.waitFor(5000);
   // console.log(page.url());
   // const btn = await page.$('a[href="/user/center"]');
@@ -77,3 +54,30 @@ const puppeteer = require('puppeteer');
   await page.close();
   await browser.close();
 })();
+
+async function gotoIconfontHome(page) {
+  await page.goto('https://www.iconfont.cn/', { waitUntil: 'networkidle0' });
+  const loginEle = await page.$('.signin');
+  await loginEle.click();
+  const loginGithubEle = await page.waitForSelector(
+    'a[href="/api/login/github"]',
+    { visible: true }
+  );
+  await loginGithubEle.click();
+}
+
+async function loginOfGithub(page) {
+  await page.waitForNavigation({ waitUntil: 'networkidle0' });
+  const loginFieldOfGithub = await page.$('#login_field');
+  await loginFieldOfGithub.type('6261625@qq.com');
+  const passwordFieldOfGithub = await page.$('#password');
+  await passwordFieldOfGithub.type('leo06010213');
+  const submitOfGithub = await page.$('input[type="submit"]');
+  await submitOfGithub.click();
+}
+
+async function authOfGithub(page) {
+  await page.waitForNavigation({ waitUntil: 'networkidle0' });
+  await page.waitForNavigation({ timeout: 5000 });
+  console.log(page.url());
+}
