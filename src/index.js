@@ -8,54 +8,15 @@ const puppeteer = require('puppeteer');
   await gotoIconfontHome(page);
   await loginOfGithub(page);
   await authOfGithub(page);
-
-  // await page.waitFor(5000);
-  // console.log(page.url());
-  // const btn = await page.$('a[href="/user/center"]');
-  // console.log(btn);
-  // console.log(await page.content());
-  // const btn = await page.$('#js-oauth-authorize-btn');
-  // console.log(btn);
-  // const a = await page.waitFor(() => {
-  //   console.log(document.body);
-  //   return true;
-  // });
-  // console.log(a.jsonValue());
-  // await page.waitFor(3000);
-  // console.log('1:', page.url());
-  // const body = await page.waitForSelector('#js-oauth-authorize-btn:enabled');
-  // console.log(body);
-  // const res = await body.$eval('body', node => {
-  //   console.log(2);
-  //   return node.innerText;
-  // });
-  // console.log(3);
-  // console.log(res);
-  // const result = await page.evaluate(x => {
-  //   console.log(2);
-  //   const body = document.body;
-  //   console.log(body);
-  //   return body;
-  // });
-
-  // console.log(page.url());
-  // console.log(await page.content());
-  // await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  // console.log(page.url());
-  // const authBtn = await page.waitForSelector('#js-oauth-authorize-btn:enabled');
-  // await page.waitFor(2000);
-  // await authBtn.click();
-
-  // console.log('返回 iconfont...');
-  // await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  // await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  // console.log(await page.content());
+  await gotoIconfontMyProjects(page);
+  await getMyProjectList(page);
 
   await page.close();
   await browser.close();
 })();
 
 async function gotoIconfontHome(page) {
+  console.log('gotoIconfontHome');
   await page.goto('https://www.iconfont.cn/', { waitUntil: 'networkidle0' });
   const loginEle = await page.$('.signin');
   await loginEle.click();
@@ -67,6 +28,7 @@ async function gotoIconfontHome(page) {
 }
 
 async function loginOfGithub(page) {
+  console.log('loginOfGithub');
   await page.waitForNavigation({ waitUntil: 'networkidle0' });
   const loginFieldOfGithub = await page.$('#login_field');
   await loginFieldOfGithub.type('6261625@qq.com');
@@ -77,7 +39,58 @@ async function loginOfGithub(page) {
 }
 
 async function authOfGithub(page) {
-  await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  await page.waitForNavigation({ timeout: 5000 });
-  console.log(page.url());
+  const isNeedAuth = async (page) => {
+    let ret = true;
+
+    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+    try {
+      await page.waitForSelector('#js-oauth-authorize-btn', { timeout: 3000 });
+    } catch {
+      ret = false;
+    }
+
+    return ret;
+  };
+
+  console.log('gotoIconfontHome');
+  if (await isNeedAuth(page)) {
+    console.log('need auth');
+    const authBtn = await page.waitForSelector('#js-oauth-authorize-btn:enabled');
+    await authBtn.click();
+  } else {
+    console.log('don\'t need auth');
+  }
+}
+
+async function gotoIconfontMyProjects(page) {
+  console.log('gotoIconfontMyProjects');
+  await page.waitForSelector('a[href="/manage/index"]', { visible: true });
+  await page.goto(
+    'https://www.iconfont.cn/manage/index?manage_type=myprojects',
+    { waitUntil: 'networkidle0' }
+  );
+}
+
+async function getMyProjectList(page) {
+  console.log('getMyProjectList');
+  const list = await page.waitForSelector(
+    '.nav-container:nth-child(2) > .nav-lists',
+    { visible: true }
+  );
+  const ret = await list.$$eval(
+    '.nav-item',
+    (nodes) => {
+      return nodes.map(n => {
+        /changeProject\((\d+)\)/.test(n.getAttribute('mx-click'));
+        return {
+          pId: RegExp.$1,
+          pName: n.children[0].innerHTML
+        };
+      });
+    });
+  console.log('ret:', ret);
+
+  const links = await page.$$('.nav-container:nth-child(2) > .nav-lists >.nav-item');
+
+  console.log(links);
 }
