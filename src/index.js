@@ -1,18 +1,31 @@
 const puppeteer = require('puppeteer');
+const axios = require('axios');
+const csstree = require('css-tree');
 
 (async () => {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  page.on('load', () => console.log(`Page loaded! url: ${page.url()}`));
+  // const browser = await puppeteer.launch();
+  // const page = await browser.newPage();
+  // page.on('load', () => console.log(`Page loaded! url: ${page.url()}`));
+  //
+  // await gotoIconfontHome(page);
+  // await loginOfGithub(page);
+  // await authOfGithub(page);
+  // await gotoIconfontMyProjects(page);
+  // await getMyProjectList(page);
+  // await getProjectUrl(page);
+  //
+  // await page.close();
+  // await browser.close();
 
-  await gotoIconfontHome(page);
-  await loginOfGithub(page);
-  await authOfGithub(page);
-  await gotoIconfontMyProjects(page);
-  await getMyProjectList(page);
-
-  await page.close();
-  await browser.close();
+  const res = await axios.get('https://at.alicdn.com/t/font_675329_sl1liiavrv.css');
+  const ast = csstree.parse(res.data);
+  csstree.walk(ast, function(node, item, list) {
+    if (node.type === 'Declaration' && node.property === 'src' && list) {
+      console.log(item.data);
+    }
+  });
+  // console.log(csstree.generate(ast));
+  // console.log(ast.stylesheet.rules[0].declarations);
 })();
 
 async function gotoIconfontHome(page) {
@@ -88,9 +101,61 @@ async function getMyProjectList(page) {
         };
       });
     });
-  console.log('ret:', ret);
+  console.log('My project list:', ret);
+}
 
-  const links = await page.$$('.nav-container:nth-child(2) > .nav-lists >.nav-item');
+async function getProjectUrl(page) {
+  const link = await page.waitForSelector(
+    '.nav-container:nth-child(2) > .nav-lists >.nav-item:nth-child(3)',
+    { visible: true }
+  );
+  const projectName = await link.$eval('span', node => {
+    return node.innerHTML;
+  });
+  console.log(`project name: ${projectName}`);
+  await link.click();
 
-  console.log(links);
+  // 这里有个难点，怎么等待 ajax 结束最简单？
+  await page.waitFor(1000);
+  console.log(page.url());
+
+  await page.waitForSelector('.type-select.clearfix', { visible: true });
+  const fontClassLink = await page.waitForSelector('.type-select.clearfix > li:nth-child(2)');
+  await fontClassLink.click();
+  const managerBar = await page.waitForSelector('.project-manage-bar');
+  const needClickOnlineBtn = await managerBar.$eval('.bar-link', node => {
+    return !node.classList.contains('show');
+  });
+  if (needClickOnlineBtn) {
+    const onlineBtn = await page.$('.project-manage-bar > .bar-link');
+    await onlineBtn.click();
+  }
+
+  await page.waitForSelector('.project-code-top', { visible: true });
+  const needRefresh = await managerBar.$$eval('.cover-btn', nodes => {
+    return nodes.length > 1;
+  });
+  if (needRefresh) {
+    console.log('css file need refresh!');
+    const refreshBtn = await page.waitForSelector('.project-code-top > .cover-btn:nth-child(2)');
+    await refreshBtn.click();
+
+    // 等待遮罩结束
+    let mask = await page.waitForSelector('.mp-e2e-body');
+    while (mask != null) {
+      await page.waitFor(300);
+      try {
+        mask = await page.waitForSelector('.mp-e2e-body', 50);
+      } catch {
+        mask = null;
+      }
+    }
+  }
+
+  await page.waitForSelector('.project-code-top', { visible: true });
+  const codeContainers = await page.$$('.project-code-top ~ .project-code-container');
+  const code = await codeContainers[1].$eval('pre', node => {
+    return node.innerHTML;
+  });
+  console.log(`css url: https:${code}`);
 }
