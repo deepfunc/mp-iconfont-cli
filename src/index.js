@@ -17,15 +17,17 @@ const csstree = require('css-tree');
   // await page.close();
   // await browser.close();
 
-  const res = await axios.get('https://at.alicdn.com/t/font_675329_sl1liiavrv.css');
-  const ast = csstree.parse(res.data);
-  csstree.walk(ast, function(node, item, list) {
-    if (node.type === 'Declaration' && node.property === 'src' && list) {
-      console.log(item.data);
-    }
-  });
-  // console.log(csstree.generate(ast));
-  // console.log(ast.stylesheet.rules[0].declarations);
+  const res = await axios.get('https://at.alicdn.com/t/font_1543352_zgs8qbhk4x.css');
+  let ast = csstree.parse(res.data);
+  ast = csstree.toPlainObject(ast);
+  const firstBlock = ast.children[0].block;
+  firstBlock.children.splice(1, 1);
+  const srcDeclarationContents = firstBlock.children[1].value.children;
+  srcDeclarationContents.splice(0, 4);
+  srcDeclarationContents.splice(3, srcDeclarationContents.length - 3);
+
+  const content = csstree.generate(ast);
+  console.log(content);
 })();
 
 async function gotoIconfontHome(page) {
