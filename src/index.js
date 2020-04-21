@@ -7,12 +7,11 @@ const axios = require('axios');
 const csstree = require('css-tree');
 const mkdirp = require('mkdirp');
 
+const CWD = process.cwd();
 const spinner = ora();
 const Configstore = require('configstore');
-const packageJson = require('../package.json');
-const config = new Configstore(packageJson.name);
+const config = new Configstore(CWD);
 
-const CWD = process.cwd();
 const GITHUB_ACCOUNT = 'githubAccount';
 const GITHUB_PASSWORD = 'githubPassword';
 const ICON_PROJECT_IDX = 'iconProjectIdx';
@@ -32,6 +31,9 @@ async function updateIconfontMain() {
     await getMyProjectList(page);
     const url = await getProjectUrl(page);
     await saveWxssFile(url);
+  } catch (e) {
+    spinner.stop();
+    throw e;
   } finally {
     await page.close();
     await browser.close();

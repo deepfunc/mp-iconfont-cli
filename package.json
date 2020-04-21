@@ -1,12 +1,12 @@
 {
   "name": "mp-iconfont-cli",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "",
   "bin": {
     "iconfont-update": "./bin/cli.js"
   },
   "scripts": {
-    "run": "node ./bin/cli.js",
+    "run": "node ./bin/cli.js --trace",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
