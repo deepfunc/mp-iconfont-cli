@@ -233,7 +233,6 @@ async function saveWxssFile(url) {
       savePathInput.savePath = WXSS_DEFAULT_RELATIVE_PATH;
     }
     savePath = path.resolve(CWD, savePathInput.savePath);
-    console.log(savePath);
     config.set(WXSS_SAVE_PATH, savePath);
   }
 
