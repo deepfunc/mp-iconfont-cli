@@ -1,56 +1,42 @@
+const path = require('path');
+const fs = require('fs');
 const puppeteer = require('puppeteer');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const axios = require('axios');
 const csstree = require('css-tree');
+const mkdirp = require('mkdirp');
 
 const spinner = ora();
 const Configstore = require('configstore');
 const packageJson = require('../package.json');
 const config = new Configstore(packageJson.name);
 
+const CWD = process.cwd();
 const GITHUB_ACCOUNT = 'githubAccount';
 const GITHUB_PASSWORD = 'githubPassword';
+const ICON_PROJECT_IDX = 'iconProjectIdx';
+const WXSS_SAVE_PATH = 'wxssSavePath';
+const WXSS_DEFAULT_RELATIVE_PATH = 'src/styles/iconfont.wxss';
 
 async function updateIconfontMain() {
-  const spinner = ora();
   spinner.start('正在初始化');
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   spinner.succeed('初始化完毕');
-  await gotoIconfontHome(page);
-  await loginOfGithub(page);
-  await authOfGithub(page);
-  await gotoIconfontMyProjects(page);
-  await getMyProjectList(page);
-
-  await page.close();
-  await browser.close();
+  try {
+    await gotoIconfontHome(page);
+    await loginOfGithub(page);
+    await authOfGithub(page);
+    await gotoIconfontMyProjects(page);
+    await getMyProjectList(page);
+    const url = await getProjectUrl(page);
+    await saveWxssFile(url);
+  } finally {
+    await page.close();
+    await browser.close();
+  }
 }
-
-(async () => {
-  // const browser = await puppeteer.launch();
-  // const page = await browser.newPage();
-  // page.on('load', () => console.log(`Page loaded! url: ${page.url()}`));
-  //
-  // await gotoIconfontMyProjects(page);
-  // await getMyProjectList(page);
-  // await getProjectUrl(page);
-  //
-  // await page.close();
-  // await browser.close();
-  // const res = await axios.get('https://at.alicdn.com/t/font_1543352_zgs8qbhk4x.css');
-  // let ast = csstree.parse(res.data);
-  // ast = csstree.toPlainObject(ast);
-  // const firstBlock = ast.children[0].block;
-  // firstBlock.children.splice(1, 1);
-  // const srcDeclarationContents = firstBlock.children[1].value.children;
-  // srcDeclarationContents.splice(0, 4);
-  // srcDeclarationContents.splice(3, srcDeclarationContents.length - 3);
-  //
-  // const content = csstree.generate(ast);
-  // console.log(content);
-})();
 
 async function gotoIconfontHome(page) {
   spinner.start('访问 iconfont 主页');
@@ -72,8 +58,6 @@ async function loginOfGithub(page) {
   spinner.succeed('GitHub 登录页面加载完毕');
   let account = config.get(GITHUB_ACCOUNT);
   let password = config.get(GITHUB_PASSWORD);
-  // console.log(account);
-  // console.log(password);
 
   if (account == null) {
     const githubAccountInput = await inquirer.prompt({
@@ -148,28 +132,38 @@ async function getMyProjectList(page) {
     });
   });
   spinner.succeed('我的项目列表加载完毕');
-  const iconProject = await inquirer.prompt({
-    type: 'rawlist',
-    name: 'iconProject',
-    message: '请选择 iconfont 项目：',
-    choices: projectList.map(p => p.name)
-  });
+
+  let iconProjectIdx = config.get(ICON_PROJECT_IDX);
+  if (iconProjectIdx == null || iconProjectIdx < 0) {
+    const iconProjectInput = await inquirer.prompt({
+      type: 'rawlist',
+      name: 'iconProject',
+      message: '请选择 iconfont 项目：',
+      choices: projectList.map(p => p.name)
+    });
+    iconProjectIdx = projectList.findIndex(
+      p => p.name === iconProjectInput.iconProject
+    );
+    config.set(ICON_PROJECT_IDX, iconProjectIdx);
+  }
 }
 
 async function getProjectUrl(page) {
+  const iconProjectIdx = config.get(ICON_PROJECT_IDX);
   const link = await page.waitForSelector(
-    '.nav-container:nth-child(2) > .nav-lists >.nav-item:nth-child(3)',
+    `.nav-container:nth-child(2) > .nav-lists >.nav-item:nth-child(` +
+      `${iconProjectIdx + 1})`,
     { visible: true }
   );
   const projectName = await link.$eval('span', node => {
     return node.innerHTML;
   });
-  console.log(`project name: ${projectName}`);
+  spinner.info(`选择的项目是：${projectName}`);
+  spinner.start('正在获取 CSS 地址');
   await link.click();
 
   // 这里有个难点，怎么等待 ajax 结束最简单？
   await page.waitFor(1000);
-  console.log(page.url());
 
   await page.waitForSelector('.type-select.clearfix', { visible: true });
   const fontClassLink = await page.waitForSelector(
@@ -190,7 +184,6 @@ async function getProjectUrl(page) {
     return nodes.length > 1;
   });
   if (needRefresh) {
-    console.log('css file need refresh!');
     const refreshBtn = await page.waitForSelector(
       '.project-code-top > .cover-btn:nth-child(2)'
     );
@@ -212,12 +205,57 @@ async function getProjectUrl(page) {
   const codeContainers = await page.$$(
     '.project-code-top ~ .project-code-container'
   );
-  const code = await codeContainers[1].$eval('pre', node => {
+  let code = await codeContainers[1].$eval('pre', node => {
     return node.innerHTML;
   });
-  console.log(`css url: https:${code}`);
+  code = `https:${code}`;
+  spinner.succeed('CSS 地址获取完毕');
+  return code;
+}
+
+async function saveWxssFile(url) {
+  spinner.start('正在下载 CSS 文件');
+  const res = await axios.get(
+    'https://at.alicdn.com/t/font_1543352_zgs8qbhk4x.css'
+  );
+  spinner.succeed('CSS 文件下载完毕');
+  let savePath = config.get(WXSS_SAVE_PATH);
+  if (savePath == null || savePath === '') {
+    const savePathInput = await inquirer.prompt({
+      type: 'input',
+      name: 'savePath',
+      message: '请输入 WXSS 文件保存路径：',
+      default: WXSS_DEFAULT_RELATIVE_PATH
+    });
+    if (savePathInput.savePath === '') {
+      savePathInput.savePath = WXSS_DEFAULT_RELATIVE_PATH;
+    }
+    savePath = path.resolve(CWD, savePathInput.savePath);
+    console.log(savePath);
+    config.set(WXSS_SAVE_PATH, savePath);
+  }
+
+  spinner.start('正在生成 WXSS 文件');
+  let ast = csstree.parse(res.data);
+  ast = csstree.toPlainObject(ast);
+  const firstBlock = ast.children[0].block;
+  firstBlock.children.splice(1, 1);
+  const srcDeclarationContents = firstBlock.children[1].value.children;
+  srcDeclarationContents.splice(0, 4);
+  srcDeclarationContents.splice(3, srcDeclarationContents.length - 3);
+
+  const content = csstree.generate(ast);
+  await mkdirp(path.dirname(savePath));
+  fs.writeFileSync(savePath, content);
+  spinner.succeed('WXSS 文件保存完毕');
+  spinner.info(`WXSS 文件路径是：${savePath}`);
+}
+
+function clearSettings() {
+  config.clear();
 }
 
 module.exports = {
-  updateIconfontMain
+  updateIconfontMain,
+  clearSettings
 };

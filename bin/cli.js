@@ -2,43 +2,23 @@
 
 const program = require('commander');
 const ora = require('ora');
-const inquirer = require('inquirer');
-const { updateIconfontMain } = require('../src');
+const { updateIconfontMain, clearSettings } = require('../src');
 
-program.option('--test <test>', 'test');
+const spinner = ora();
+
+program.option('--clear', '清除所有设定');
+program.option('--trace', '显示具体异常内容');
 
 program.parse(process.argv);
-// console.log(`test: ${program.test}`);
 
-updateIconfontMain();
-//
-// const spinner = ora('Loading...').start();
-//
-// setTimeout(() => {
-//   spinner.succeed('Succeed.');
-// }, 2000);
-
-// inquirer
-//   .prompt([
-//     {
-//       type: 'list',
-//       name: 'theme',
-//       message: 'What do you want to do?',
-//       choices: [
-//         'Order a pizza',
-//         'Make a reservation'
-//       ]
-//     },
-//     {
-//       type: 'rawlist',
-//       name: 'size',
-//       message: 'What size do you need',
-//       choices: ['Jumbo', 'Large', 'Standard', 'Medium', 'Small', 'Micro'],
-//       // filter: function (val) {
-//       //   return val.toLowerCase();
-//       // }
-//     }
-//   ])
-//   .then(answers => {
-//     console.log(JSON.stringify(answers, null, '  '));
-//   });
+if (program.clear) {
+  clearSettings();
+} else {
+  updateIconfontMain().catch(err => {
+    spinner.clear();
+    spinner.fail('出错了，请重试下！');
+    if (program.trace) {
+      console.error(err);
+    }
+  });
+}
