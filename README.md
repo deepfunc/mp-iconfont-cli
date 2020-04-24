@@ -22,7 +22,7 @@ npm i -D mp-iconfont-cli
 
 ### 使用范例
 
-目前仅支持 Github 账号登录 iconfont，在项目根目录下运行：
+目前仅支持 GitHub 账号登录 iconfont，在项目根目录下运行：
 
 ```shell
 npx iconfont-update
