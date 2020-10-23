@@ -217,9 +217,7 @@ async function getProjectUrl(page) {
 
 async function saveWxssFile(url) {
   spinner.start('正在下载 CSS 文件');
-  const res = await axios.get(
-    'https://at.alicdn.com/t/font_1543352_zgs8qbhk4x.css'
-  );
+  const res = await axios.get(url);
   spinner.succeed('CSS 文件下载完毕');
   let savePath = config.get(WXSS_SAVE_PATH);
   if (savePath == null || savePath === '') {
