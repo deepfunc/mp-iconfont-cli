@@ -1,6 +1,6 @@
 {
   "name": "mp-iconfont-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "微信小程序开发中自动更新 iconfont 的小工具",
   "license": "MIT",
   "bin": {
